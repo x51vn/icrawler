@@ -142,26 +142,31 @@ class GoogleFeeder(Feeder):
 
 
 class GoogleParser(Parser):
-    def parse(self, response):
-        soup = BeautifulSoup(response.content.decode("utf-8", "ignore"), "lxml")
-        # image_divs = soup.find_all('script')
-        image_divs = soup.find_all(name="script")
-        for div in image_divs:
-            # txt = div.text
-            txt = str(div)
-            # if not txt.startswith('AF_initDataCallback'):
-            if "AF_initDataCallback" not in txt:
-                continue
-            if "ds:0" in txt or "ds:1" not in txt:
-                continue
-            # txt = re.sub(r"^AF_initDataCallback\({.*key: 'ds:(\d)'.+data:function\(\){return (.+)}}\);?$",
-            #             "\\2", txt, 0, re.DOTALL)
-            # meta = json.loads(txt)
-            # data = meta[31][0][12][2]
-            # uris = [img[1][3][0] for img in data if img[0] == 1]
+    def is_valid_url(self, url, check_url_encode_only=True):
+        print(f'URL: {url}')
+        if ',' in url:
+            return False
+        if not url.startswith('http'):
+            return False
+        if re.search(r'\\x|\\u', url):
+            return False
+        # url would not contain space or < or >
+        if ' ' in url or '<' in url or '>' in url:
+            return False
+        # url would not contains icons
+        if 'icons' in url:
+            return False
+        return True
 
-            uris = re.findall(r"http[^\[]*?\.(?:jpg|png|bmp)", txt)
-            return [{"file_url": uri} for uri in uris]
+    def parse(self, response):
+        # soup = BeautifulSoup(response.content.decode("utf-8", "ignore"), "html.parser")
+        # Parse the HTML response
+        soup = BeautifulSoup(response.text, 'html.parser')
+        # find all string end with .jpg or .png
+        txt = str(soup)
+        uris = re.findall(r'http[^\[]*?\.(?:jpg)', txt)
+        uris = [uri for uri in uris if self.is_valid_url(uri)]
+        return [{"file_url": uri} for uri in uris]
 
 
 class GoogleImageCrawler(Crawler):
